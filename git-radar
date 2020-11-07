@@ -93,12 +93,7 @@ while [[ $# > 0 ]];do
   shift
 
   if [[ "$command" == "--fetch" ]]; then
-    his=$(cat ~/.bash_history | tail -n1)
-    if [[ "$his" != *"git pull"* && "$his" != *"git fetch"* ]]; then
-      nohup $dot/fetch.sh >/dev/null 2>&1 &
-    else
-      echo " " >> ~/.bash_history
-    fi
+    nohup $dot/fetch.sh >/dev/null 2>&1 &
   fi
 
   if [[ "$command" == "--zsh" ]]; then

@@ -28,6 +28,21 @@ get_fetch_time() {
 
 }
 
+get_prompt_prefix_and_suffix_strings() {
+  if [ -f "$rcfile_path/.gitradarrc.bash" ]; then
+    source "$rcfile_path/.gitradarrc.bash"
+  elif [ -f "$rcfile_path/.gitradarrc.zsh" ]; then
+    source "$rcfile_path/.gitradarrc.zsh"
+  elif [ -f "$rcfile_path/.gitradarrc" ]; then
+    source "$rcfile_path/.gitradarrc"
+  fi
+
+  declare -n ret1=$1
+  declare -n ret2=$2
+  ret1="${GIT_RADAR_PROMPT_PREFIX_STRING:-" "}"
+  ret2="${GIT_RADAR_PROMPT_SUFFIX_STRING:-""}"
+}
+
 prepare_bash_colors() {
   if [ -f "$rcfile_path/.gitradarrc.bash" ]; then
     source "$rcfile_path/.gitradarrc.bash"
@@ -56,7 +71,7 @@ prepare_bash_colors() {
   COLOR_BRANCH="\x01${GIT_RADAR_COLOR_BRANCH:-"\\033[0m"}\x02"
   MASTER_SYMBOL="${GIT_RADAR_MASTER_SYMBOL:-"\\x01\\033[0m\\x02\\xF0\\x9D\\x98\\xAE\\x01\\033[0m\\x02"}"
 
-  PROMPT_FORMAT="${GIT_RADAR_FORMAT:-" \\x01\\033[1;30m\\x02git:(\\x01\\033[0m\\x02%{remote: }%{branch}%{ :local}\\x01\\033[1;30m\\x02)\\x01\\033[0m\\x02%{ :stash}%{ :changes}"}"
+  PROMPT_FORMAT="${GIT_RADAR_FORMAT:-"\\x01\\033[1;30m\\x02git:(\\x01\\033[0m\\x02%{remote: }%{branch}%{ :local}\\x01\\033[1;30m\\x02)\\x01\\033[0m\\x02%{ :stash}%{ :changes}"}"
 
   RESET_COLOR_LOCAL="\x01${GIT_RADAR_COLOR_LOCAL_RESET:-"\\033[0m"}\x02"
   RESET_COLOR_REMOTE="\x01${GIT_RADAR_COLOR_REMOTE_RESET:-"\\033[0m"}\x02"
@@ -337,6 +352,7 @@ staged_status() {
   local filesDeleted="$(printf '%s' "$gitStatus" | grep -oE "D[AMCR ] " | wc -l | grep -oEi '[1-9][0-9]*')"
   local filesRenamed="$(printf '%s' "$gitStatus" | grep -oE "R[AMCD ] " | wc -l | grep -oEi '[1-9][0-9]*')"
   local filesCopied="$(printf '%s' "$gitStatus" | grep -oE "C[AMDR ] " | wc -l | grep -oEi '[1-9][0-9]*')"
+  local typeChanged="$(printf '%s' "$gitStatus" | grep -oE "T[AMDR ] " | wc -l | grep -oEi '[1-9][0-9]*')"
 
   if [ -n "$filesAdded" ]; then
     staged_string="$staged_string$filesAdded${prefix}A${suffix}"
@@ -352,6 +368,9 @@ staged_status() {
   fi
   if [ -n "$filesCopied" ]; then
     staged_string="$staged_string$filesCopied${prefix}C${suffix}"
+  fi
+  if [ -n "$typeChanged" ]; then
+    staged_string="$staged_string$typeChanged${prefix}TC${suffix}"
   fi
   printf '%s' "$staged_string"
 }
@@ -386,12 +405,16 @@ unstaged_status() {
 
   local filesModified="$(printf '%s' "$gitStatus" | grep -oE "[ACDRM ]M " | wc -l | grep -oEi '[1-9][0-9]*')"
   local filesDeleted="$(printf '%s' "$gitStatus" | grep -oE "[AMCR ]D " | wc -l | grep -oEi '[1-9][0-9]*')"
+  local typeChanged="$(printf '%s' "$gitStatus" | grep -oE "[AMDR ]T " | wc -l | grep -oEi '[1-9][0-9]*')"
 
   if [ -n "$filesDeleted" ]; then
     unstaged_string="$unstaged_string$filesDeleted${prefix}D${suffix}"
   fi
   if [ -n "$filesModified" ]; then
     unstaged_string="$unstaged_string$filesModified${prefix}M${suffix}"
+  fi
+  if [ -n "$typeChanged" ]; then
+    unstaged_string="$unstaged_string$typeChanged${prefix}TC${suffix}"
   fi
   printf '%s' "$unstaged_string"
 }
@@ -604,7 +627,9 @@ render_prompt() {
     fi
   fi
 
-  printf '%b' "$output" | sed \
+  get_prompt_prefix_and_suffix_strings prefix_string suffix_string
+
+  printf '%b' "${prefix_string}${output}${suffix_string}" | sed \
                             -e "$remote_sed" \
                             -e "$branch_sed" \
                             -e "$changes_sed" \
